@@ -1,0 +1,223 @@
+<html>
+
+<head>
+    <style>
+        .used {
+            background-color: aquamarine;
+            white-space: break-spaces;
+            line-break: anywhere;
+        }
+
+        .noUsed {
+            background-color: lightcoral;
+            white-space: break-spaces;
+            line-break: anywhere;
+        }
+
+        #regData {
+            display: inline;
+            width: 30%;
+
+        }
+
+        #content {
+            display: inline;
+            width: 70%;
+            float: left;
+        }
+    </style>
+
+</head>
+
+<body>
+    <h1>welcome to this awesome page</h1>
+    <p>please select a file below to have a look at used/unused files</p>
+    <ul id="unusedFileList"></ul>
+    <h2>Result</h2>
+    <button type="button" onclick="showAll()">ALL</button>
+    <button type="button" onclick="hideNonUsed()">Used</button>
+    <button type="button" onclick="hideUsed()">Not Used</button>
+    <form>
+        <label for="regexp">Regexp:</label>
+        <input type="text" id="regexp" name="regExp">
+        <select name="regExp" id="regExpDrowpdown" onchange="populateRegexp()">
+            <option disabled selected value> -- select an option -- </option>
+            <option value="\.[a-zA-Z-]+">Top Level Selectors</option>
+        </select>
+        <button type="button" onclick="runRegexp()">Count Occurances</button>
+    </form>
+    <div id="content"></div>
+    <div id="regData"></div>
+</body>
+
+<script>
+
+
+
+    var rawPresentedData;
+    fetch('/report')
+        .then(function (response) {
+            return response.json();
+        })
+        .then(function (data) {
+            paintFileList(data);
+        })
+
+    var allClasseRegexp = "\\.[a-zA-Z-]+";
+
+    function populateRegexp(){
+            let dropdown = document.getElementById("regExpDrowpdown");
+            let dropdownValue = dropdown.value;
+            document.getElementById('regexp').value = dropdownValue;
+    }
+
+    function runRegexp() {
+
+        var map = new Map();
+        let regExpText = document.getElementById('regexp').value;
+        let reg = new RegExp(regExpText, 'g');
+        let visibleText = "";
+
+        let allNodes = document.getElementById("content").childNodes[0].childNodes;
+        allNodes.forEach(n => {
+            if (n.style.display != "none") {
+                visibleText += n.innerText;
+            }
+        });
+        var regArray = visibleText.match(reg);
+
+
+        let uniqArray = [];
+
+        regArray.forEach(i => {
+            let uniqItem = uniqArray.filter(v => v.item == i);
+            if(uniqItem.length == 0){
+                uniqArray.push({item : i.toString(), amount : 0});
+            }
+            else{
+                uniqItem[0].amount++;
+            }
+
+
+        });
+
+        uniqArray.sort((a,b) => (a.amount > b.amount) ? -1 : ((b.amount > a.amount) ? 1 : 0))
+
+        console.log(uniqArray);
+
+        let text = "";
+
+        uniqArray.forEach(i => {
+            text+= i.item + " : " + i.amount + "<br/>";
+        })
+
+        let node = document.createElement("P");
+        node.innerHTML = text;
+
+        document.getElementById("regData").replaceChildren(node);
+    }
+
+    function paintFileList(data) {
+        data.forEach(fileName => {
+
+            var liNode = document.createElement("LI");
+            liNode.innerHTML = "<a href='#' onclick=\"paintFileContent(\'" + fileName + "\')\">" + fileName + "</>"
+            document.getElementById("unusedFileList").appendChild(liNode);
+        });
+
+    }
+
+    function hideUsed() {
+        let elements = document.getElementsByClassName("used");
+        for (var i = 0; i < elements.length; i++) {
+            elements[i].style.display = "none";
+        }
+    }
+
+    function hideNonUsed() {
+        let elements = document.getElementsByClassName("noUsed");
+        for (var i = 0; i < elements.length; i++) {
+            elements[i].style.display = "none";
+        }
+    }
+
+    function showAll() {
+        let elements = document.getElementsByClassName("noUsed");
+        for (var i = 0; i < elements.length; i++) {
+            elements[i].style.display = "inline";
+        }
+        let elements2 = document.getElementsByClassName("used");
+        for (var i = 0; i < elements2.length; i++) {
+            elements2[i].style.display = "inline";
+        }
+    }
+
+    function paintFileContent(url) {
+        fetch('/report/' + url)
+            .then(function (response) {
+                return response.json();
+            })
+            .then(function (data) {
+                rawPresentedData = data;
+                html = "";
+                var lastByteUsed = rawPresentedData.usageByteArray[0];
+                if (lastByteUsed) {
+                    html += "<span class='used'>";
+                }
+                else {
+                    html += "<span class='noUsed'>";
+                }
+
+                for (var i = 0; i < rawPresentedData.usageByteArray.length; i++) {
+
+
+                    let currentByteUsed = rawPresentedData.usageByteArray[i];
+                    let currentChar = rawPresentedData.text.slice(i, i + 1);
+
+                    if(currentChar === "}") {
+                        html += "<br/>"
+                    }
+
+
+                    if (currentByteUsed == lastByteUsed) {
+                        html += currentChar;
+                    }
+                    else {
+                        html += "</span>";
+                        if (currentByteUsed) {
+                            html += "<span class='used'>";
+                        }
+                        else {
+                            html += "<span class='noUsed'>";
+                        }
+                        html += currentChar;
+                    }
+                    lastByteUsed = currentByteUsed;
+
+                    //mini prettify
+                    if(currentChar === "}") {
+                        html += "<br/>"
+                    }
+
+                    if(currentChar === ";"){
+                        html += "<br/>\t";
+                    }
+
+                    if(currentChar === "{"){
+                        html+="<br/>\t"
+                    }
+
+
+                }
+                html += "</span>";
+
+                var node = document.createElement("P");
+                node.innerHTML = html;
+
+                document.getElementById("content").replaceChildren(node);
+            })
+    }
+
+</script>
+
+</html>
